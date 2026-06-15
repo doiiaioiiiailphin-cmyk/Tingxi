@@ -721,7 +721,7 @@
     SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/><path d="M17.5 7.5a6 6 0 010 9"/><path d="M20 6a9.5 9.5 0 010 12"/>', // 3 三道
   ];
   const ICON_MUTED = SPK + '<path d="M17 9l4 6M21 9l-4 6"/>';
-  function volLevel(v) { return v < 0.25 ? 0 : v < 0.5 ? 1 : v < 0.75 ? 2 : 3; }
+  function volLevel(v) { return v <= 0.001 ? 0 : v < 0.34 ? 1 : v < 0.67 ? 2 : 3; }
 
   function applyVolume() {
     Engine.setVolume(state.muted ? 0 : volToGain(state.volume));          // 静音则不发声
