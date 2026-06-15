@@ -712,15 +712,13 @@
   bindDrag(els.progress.querySelector(".progress__track"), (p) => seekTo(p));
   bindDrag(els.volBar, (p) => setVolume(p));
 
-  // 音量图标：非静音按四级（无波/一道/两道/三道）；静音为喇叭+×
-  const SPK = '<path d="M4 9v6h4l5 4V5L8 9H4z"/>';
-  const VOL_ICONS = [
-    SPK,                                                                                       // 0 无波
-    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/>',                                               // 1 一道
-    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/><path d="M17.5 7.5a6 6 0 010 9"/>',              // 2 两道
-    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/><path d="M17.5 7.5a6 6 0 010 9"/><path d="M20 6a9.5 9.5 0 010 12"/>', // 3 三道
-  ];
-  const ICON_MUTED = SPK + '<path d="M17 9l4 6M21 9l-4 6"/>';
+  // 音量图标：喇叭体 + 三道同心波（淡入淡出）+ 静音叉。常驻结构，靠 data-waves 切换。
+  const ICON_FULL =
+    '<path class="vol-body" d="M4 9v6h4l5 4V5L8 9H4z"/>' +
+    '<path class="vol-wave w1" d="M14.68 9.03A4 4 0 0 1 14.68 14.97"/>' +
+    '<path class="vol-wave w2" d="M16.68 6.80A7 7 0 0 1 16.68 17.20"/>' +
+    '<path class="vol-wave w3" d="M18.69 4.57A10 10 0 0 1 18.69 19.43"/>' +
+    '<path class="vol-x" d="M17 9l4 6M21 9l-4 6"/>';
   function volLevel(v) { return v <= 0.001 ? 0 : v < 0.34 ? 1 : v < 0.67 ? 2 : 3; }
 
   function applyVolume() {
@@ -729,7 +727,8 @@
     els.volThumb.style.left = (state.volume * 100) + "%";
     els.volume.classList.toggle("is-muted", state.muted);                 // 静音时变灰
     els.muteBtn.title = state.muted ? "取消静音" : "静音";
-    els.iconVolume.innerHTML = state.muted ? ICON_MUTED : VOL_ICONS[volLevel(state.volume)];
+    if (!els.iconVolume.dataset.init) { els.iconVolume.innerHTML = ICON_FULL; els.iconVolume.dataset.init = "1"; }
+    els.iconVolume.setAttribute("data-waves", state.muted ? 0 : volLevel(state.volume));
   }
   function setVolume(v) {
     state.volume = clamp(v, 0, 1);

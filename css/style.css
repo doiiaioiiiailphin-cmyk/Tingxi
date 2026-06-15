@@ -310,6 +310,17 @@ ul { list-style: none; margin: 0; padding: 0; }
 .volume.is-muted .volume__fill { background: rgba(255,255,255,0.20); }
 .volume.is-muted .volume__thumb { background: rgba(255,255,255,0.6); }
 .volume.is-muted .ctrl { color: var(--text-dim); }
+/* 音量波纹：三道同心圆弧，淡入淡出 */
+.vol-wave { opacity: 0; transition: opacity .32s var(--ease); }
+#iconVolume[data-waves="1"] .w1 { opacity: 1; }
+#iconVolume[data-waves="2"] .w1,
+#iconVolume[data-waves="2"] .w2 { opacity: 1; }
+#iconVolume[data-waves="3"] .w1,
+#iconVolume[data-waves="3"] .w2,
+#iconVolume[data-waves="3"] .w3 { opacity: 1; }
+.vol-x { opacity: 0; transition: opacity .25s var(--ease); }
+.volume.is-muted .vol-wave { opacity: 0 !important; }
+.volume.is-muted .vol-x { opacity: 1; }
 
 /* ---------- 幽灵按钮 ---------- */
 .ghost-btn {
