@@ -320,7 +320,7 @@
       this.synthBus.connect(this.bus);
       const now = ctx.currentTime;
       this.synthBus.gain.setValueAtTime(0.0001, now);
-      this.synthBus.gain.exponentialRampToValueAtTime(0.5, now + 1.8);  // 合成轨整体降 ~6dB，避免过响
+      this.synthBus.gain.exponentialRampToValueAtTime(0.38, now + 1.8); // 合成轨整体降 ~8dB，避免过响
 
       const me = this;
       const v = VOICES[track.voice] || VOICES.piano;
@@ -712,6 +712,16 @@
   bindDrag(els.progress.querySelector(".progress__track"), (p) => seekTo(p));
   bindDrag(els.volBar, (p) => setVolume(p));
 
+  // 音量图标四级：0 静音 / 1 低 / 2 中 / 3 高
+  const SPK = '<path d="M4 9v6h4l5 4V5L8 9H4z"/>';
+  const VOL_ICONS = [
+    SPK + '<path d="M17 9l4 6M21 9l-4 6"/>',                                   // 0 静音（×）
+    SPK,                                                                        // 1 低（无波）
+    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/>',                                // 2 中（一道波）
+    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/><path d="M18 7a8 8 0 010 10"/>',  // 3 高（两道波）
+  ];
+  function volLevel(v) { return v <= 0.001 ? 0 : v < 0.34 ? 1 : v < 0.67 ? 2 : 3; }
+
   function setVolume(v) {
     v = clamp(v, 0, 1);
     state.volume = v;
@@ -722,6 +732,7 @@
     els.volThumb.style.left = (v * 100) + "%";
     els.volume.classList.toggle("is-muted", state.muted);
     els.muteBtn.title = state.muted ? "取消静音" : "静音";
+    els.iconVolume.innerHTML = VOL_ICONS[volLevel(v)];   // 四级图标切换
     try { localStorage.setItem(STORE_KEY, String(v)); } catch (e) {}   // 永久记忆音量
   }
 
