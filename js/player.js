@@ -320,7 +320,7 @@
       this.synthBus.connect(this.bus);
       const now = ctx.currentTime;
       this.synthBus.gain.setValueAtTime(0.0001, now);
-      this.synthBus.gain.exponentialRampToValueAtTime(1, now + 1.8);
+      this.synthBus.gain.exponentialRampToValueAtTime(0.5, now + 1.8);  // 合成轨整体降 ~6dB，避免过响
 
       const me = this;
       const v = VOICES[track.voice] || VOICES.piano;
