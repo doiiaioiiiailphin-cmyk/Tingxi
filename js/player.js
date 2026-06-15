@@ -712,38 +712,42 @@
   bindDrag(els.progress.querySelector(".progress__track"), (p) => seekTo(p));
   bindDrag(els.volBar, (p) => setVolume(p));
 
-  // 音量图标四级：0 静音 / 1 低 / 2 中 / 3 高
+  // 音量图标：非静音按四级（无波/一道/两道/三道）；静音为喇叭+×
   const SPK = '<path d="M4 9v6h4l5 4V5L8 9H4z"/>';
   const VOL_ICONS = [
-    SPK + '<path d="M17 9l4 6M21 9l-4 6"/>',                                   // 0 静音（×）
-    SPK,                                                                        // 1 低（无波）
-    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/>',                                // 2 中（一道波）
-    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/><path d="M18 7a8 8 0 010 10"/>',  // 3 高（两道波）
+    SPK,                                                                                       // 0 无波
+    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/>',                                               // 1 一道
+    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/><path d="M17.5 7.5a6 6 0 010 9"/>',              // 2 两道
+    SPK + '<path d="M15 9.5a3.5 3.5 0 010 5"/><path d="M17.5 7.5a6 6 0 010 9"/><path d="M20 6a9.5 9.5 0 010 12"/>', // 3 三道
   ];
-  function volLevel(v) { return v <= 0.001 ? 0 : v < 0.34 ? 1 : v < 0.67 ? 2 : 3; }
+  const ICON_MUTED = SPK + '<path d="M17 9l4 6M21 9l-4 6"/>';
+  function volLevel(v) { return v < 0.25 ? 0 : v < 0.5 ? 1 : v < 0.75 ? 2 : 3; }
 
-  function setVolume(v) {
-    v = clamp(v, 0, 1);
-    state.volume = v;
-    state.muted = v === 0;
-    if (v > 0) state.lastVolume = v;
-    Engine.setVolume(state.muted ? 0 : volToGain(v));   // 指数曲线，感知均匀
-    els.volFill.style.width = (v * 100) + "%";
-    els.volThumb.style.left = (v * 100) + "%";
-    els.volume.classList.toggle("is-muted", state.muted);
+  function applyVolume() {
+    Engine.setVolume(state.muted ? 0 : volToGain(state.volume));          // 静音则不发声
+    els.volFill.style.width = (state.volume * 100) + "%";                 // 条仍显示当前音量
+    els.volThumb.style.left = (state.volume * 100) + "%";
+    els.volume.classList.toggle("is-muted", state.muted);                 // 静音时变灰
     els.muteBtn.title = state.muted ? "取消静音" : "静音";
-    els.iconVolume.innerHTML = VOL_ICONS[volLevel(v)];   // 四级图标切换
-    try { localStorage.setItem(STORE_KEY, String(v)); } catch (e) {}   // 永久记忆音量
+    els.iconVolume.innerHTML = state.muted ? ICON_MUTED : VOL_ICONS[volLevel(state.volume)];
+  }
+  function setVolume(v) {
+    state.volume = clamp(v, 0, 1);
+    if (state.volume > 0) state.lastVolume = state.volume;
+    applyVolume();
+    try { localStorage.setItem(STORE_KEY, String(state.volume)); } catch (e) {}   // 永久记忆音量
+  }
+  function toggleMute() {
+    state.muted = !state.muted;
+    if (!state.muted && state.volume === 0) state.volume = state.lastVolume || 0.7; // 从零音量解除静音时恢复
+    applyVolume();
   }
 
   /* ---- 控件绑定 ---- */
   els.playBtn.addEventListener("click", togglePlay);
   els.nextBtn.addEventListener("click", next);
   els.prevBtn.addEventListener("click", prev);
-  els.muteBtn.addEventListener("click", () => {
-    if (state.muted) setVolume(state.lastVolume || 0.7);
-    else { state.lastVolume = state.volume; setVolume(0); }
-  });
+  els.muteBtn.addEventListener("click", toggleMute);
 
   /* ---- 播放列表开关 ---- */
   function openPlaylist(open) {

@@ -306,10 +306,10 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .volume__bar:hover .volume__thumb,
 .volume.dragging .volume__thumb { transform: translate(-50%, -50%) scale(1); }
-.volume.is-muted .vol-wave { opacity: 0; }
-.volume.is-muted::after {
-  /* 静音斜线 */
-}
+/* 静音：条变灰（仍可拖动，但不发声） */
+.volume.is-muted .volume__fill { background: rgba(255,255,255,0.20); }
+.volume.is-muted .volume__thumb { background: rgba(255,255,255,0.6); }
+.volume.is-muted .ctrl { color: var(--text-dim); }
 
 /* ---------- 幽灵按钮 ---------- */
 .ghost-btn {
