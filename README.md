@@ -15,6 +15,24 @@
 - 响应式：桌面 / 手机皆自适应
 - 键盘快捷键 · 媒体键 · 媒体会话集成
 - **开箱即响**：无音频文件时，由 Web Audio 实时合成 —— 五声音阶级进旋律 + 和声垫 + 低音三声部编曲，含真实卷积混响与 lookahead 节拍调度
+- **MIDI 支持**：可在播放列表中添加 `.mid/.midi` 文件，移植自 [open-midi-piano](https://github.com/doiiaioiiiailphin-cmyk/open-midi-piano) 的解析器 + SoundFont 音色引擎播放（联网自动加载 SoundFont 钢琴等音色，离线回落合成钢琴）
+
+## 添加 MIDI 音乐
+
+两种方式：
+
+1. **界面添加**：打开播放列表 → 点「MIDI」按钮（或把 `.mid` 文件直接拖到播放器）→ 自动解析入库，封面/背景按曲名生成。
+2. **代码添加**：解析后构造曲目推入 `PLAYLIST`：
+   ```js
+   const buf = await (await fetch("assets/midi/song.mid")).arrayBuffer();
+   const midi = TingxiMidi.parseMidi(buf);
+   PLAYLIST.push({ type: "midi", title: "我的曲子", artist: "MIDI",
+                   motif: "moon", rgb: [[150,140,120],[210,196,168],[104,92,76]],
+                   midi, dur: Math.round(midi.duration), src: "" });
+   ```
+
+> MIDI 播放沿用听隙的统一时间轴：进度条、拖动 seek、播放/暂停/上下首、音量、背景联动全部与合成曲目一致。
+> 首次播放 MIDI 时会从 CDN 加载 SoundFont 音色（约数 MB），离线时自动用合成钢琴兜底。
 
 ## 合成音的编曲原理
 
@@ -71,9 +89,16 @@ Tingxi/
 │   └── style.css       夜色 / 玻璃 / 留白 / 响应式
 ├── js/
 │   ├── atmosphere.js   Canvas 雾气 / 星点 / 月光
-│   └── player.js       播放引擎 / 封面 / 主题 / 交互
+│   ├── player.js       播放引擎 / 封面 / 主题 / 交互
+│   └── midi/
+│       ├── midi-parser.js   MIDI 解析（移植自 open-midi-piano）
+│       └── audio-engine.js  SoundFont 音色引擎（移植自 open-midi-piano）
 └── README.md
 ```
+
+## 许可
+
+MIT；其中 `js/midi/` 下的 MIDI 解析器与 SoundFont 引擎移植自 [open-midi-piano](https://github.com/doiiaioiiiailphin-cmyk/open-midi-piano)（GPL-3.0），相关文件遵循 GPL-3.0。
 
 ## 快捷键
 

@@ -84,15 +84,26 @@
   <aside class="playlist glass" id="playlist" aria-label="播放列表" aria-hidden="true">
     <div class="playlist__head">
       <h2>曲目</h2>
-      <button class="ctrl ctrl--sm" id="plClose" type="button" aria-label="关闭列表">
-        <svg viewBox="0 0 24 24" class="icon"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
+      <div class="playlist__actions">
+        <button class="ghost-btn ghost-btn--sm" id="midiAdd" type="button" title="添加 MIDI 文件">
+          <svg viewBox="0 0 24 24" class="icon icon--sm"><path d="M12 5v14M5 12h14"/></svg>
+          <span>MIDI</span>
+        </button>
+        <button class="ctrl ctrl--sm" id="plClose" type="button" aria-label="关闭列表">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
     </div>
     <ul class="playlist__list" id="playlistItems"></ul>
   </aside>
 
+  <input type="file" id="midiInput" accept=".mid,.midi,audio/midi,audio/x-midi" multiple hidden />
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
   <div class="scrim" id="scrim" aria-hidden="true"></div>
 
+  <script src="js/midi/midi-parser.js"></script>
+  <script src="js/midi/audio-engine.js"></script>
   <script src="js/atmosphere.js"></script>
   <script src="js/player.js"></script>
 </body>

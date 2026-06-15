@@ -189,7 +189,13 @@
     synthNodes: null,
     audioEl: null,
     useSynth: true,
+    useMidi: false,
+    midiAudio: null,
+    midiTimers: null,
+    midiPlaying: false,
     _musicTime: 0,
+    _midiStartCtxTime: 0,
+    _gen: 0,
 
     ensureCtx() {
       if (!this.ctx) {
@@ -232,7 +238,12 @@
     // 启动某首曲目的音源
     load(track) {
       this.stopSource();
-      if (track.src) {
+      if (track.type === "midi") {            // MIDI 曲目：用 SoundFont 引擎
+        this.useMidi = true; this.useSynth = false; this.midiTrack = track;
+        return;
+      }
+      this.useMidi = false;
+      if (track.src) {                        // 真实音频文件
         this.useSynth = false;
         if (!this.audioEl) {
           this.audioEl = new Audio();
@@ -240,14 +251,21 @@
           this.audioEl.preload = "auto";
         }
         this.audioEl.src = track.src;
-      } else {
+      } else {                                // 合成编曲
         this.useSynth = true;
       }
     },
 
-    play(track) {
+    async play(track) {
       this.ensureCtx();
       this.stopSource();
+      if (this.useMidi) {
+        const gen = this._gen;
+        await this._ensureMidi(track);
+        if (gen !== this._gen) return;            // 等待期间已被停止/切歌，放弃
+        this.startMidi(track);
+        return;
+      }
       if (!this.useSynth && this.audioEl) {
         if (!this._mediaSrc) {
           this._mediaSrc = this.ctx.createMediaElementSource(this.audioEl);
@@ -256,6 +274,41 @@
         this.audioEl.play().catch(() => {});   // 位置由元素自身维持（加载后为 0，暂停后续播）
       } else {
         this.startSynth(track);
+      }
+    },
+
+    /* ---- MIDI：加载音色 + 调度 ---- */
+    async _ensureMidi(track) {
+      this.ensureCtx();
+      if (!this.midiAudio) {
+        this.midiAudio = new TingxiMidi.MidiAudioEngine();
+        this.midiAudio.init(this.ctx, this.bus);
+      }
+      const progs = new Set(track.midi.notes.map((n) => n.program || 0));
+      for (const p of progs) {
+        if (p === 0) { if (this.midiAudio.pianoSamples.size === 0) await this.midiAudio.loadPiano(); }
+        else await this.midiAudio.loadInstrument(p);
+      }
+    },
+    async prepareMidi(track) { try { await this._ensureMidi(track); } catch (e) {} },
+
+    startMidi(track) {
+      const ctx = this.ctx;
+      if (this.midiTimers) this.midiTimers.forEach(clearTimeout);
+      this.midiTimers = [];
+      const offset = this._musicTime || 0;
+      this._midiStartCtxTime = ctx.currentTime - offset;
+      this.midiPlaying = true;
+      const inst = this.midiAudio;
+      for (const note of track.midi.notes) {
+        const start = note.time, end = note.time + note.duration;
+        if (end <= offset) continue;
+        const delay = Math.max(0, start - offset);
+        const remDur = end - Math.max(offset, start);
+        const p = note.program || 0;
+        const onT = setTimeout(() => inst.noteOn(note.midi, note.velocity || 90, p), delay * 1000);
+        const offT = setTimeout(() => inst.noteOff(note.midi, p), (delay + remDur) * 1000);
+        this.midiTimers.push(onT, offT);
       }
     },
 
@@ -391,8 +444,12 @@
     },
 
     stopSource() {
+      this._gen++;
       if (this._sched) { clearInterval(this._sched); this._sched = null; }
       this._reposition = null;
+      if (this.midiTimers) { this.midiTimers.forEach(clearTimeout); this.midiTimers = []; }
+      this.midiPlaying = false; this._midiStartCtxTime = 0;
+      if (this.midiAudio) this.midiAudio.allNotesOff();
       if (this.synthBus) {
         const now = this.ctx.currentTime;
         try {
@@ -412,9 +469,9 @@
       if (this.audioEl) this.audioEl.volume = clamp(v, 0, 1);
     },
 
-    // 播放位置（合成音以 _musicTime 为唯一真相；真实音频读元素）
+    // 播放位置（合成音/MIDI 以 _musicTime 为唯一真相；真实音频读元素）
     getTime(track) {
-      if (!this.useSynth && this.audioEl && this.audioEl.duration) {
+      if (!this.useSynth && !this.useMidi && this.audioEl && this.audioEl.duration) {
         return { cur: this.audioEl.currentTime, total: this.audioEl.duration };
       }
       return { cur: Math.min(this._musicTime || 0, track.dur), total: track.dur };
@@ -422,6 +479,11 @@
 
     seekTo(track, sec) {
       const s = Math.max(0, Math.min(sec, track.dur));
+      if (this.useMidi) {
+        this._musicTime = s;
+        if (this.midiPlaying) this.startMidi(track);   // 从新位置重新调度
+        return;
+      }
       if (!this.useSynth && this.audioEl) {
         try { this.audioEl.currentTime = s; } catch (e) {}
       } else {
@@ -483,6 +545,9 @@
     items: $("playlistItems"),
     scrim: $("scrim"),
     aurora: $("aurora"),
+    midiAdd: $("midiAdd"),
+    midiInput: $("midiInput"),
+    toast: $("toast"),
   };
 
   function currentTrack() { return PLAYLIST[state.index]; }
@@ -600,8 +665,12 @@
   function loop() {
     if (!state.playing) { rafId = null; return; }
     const t = currentTrack();
+    // MIDI：按音频时钟推进位置（与 setTimeout 调度同步）
+    if (Engine.useMidi && Engine._midiStartCtxTime) {
+      Engine._musicTime = Engine.ctx.currentTime - Engine._midiStartCtxTime;
+    }
     const { cur, total } = Engine.getTime(t);
-    if (total > 0 && cur >= total) { rafId = null; next(); return; }   // 合成音 / 真实音频通用
+    if (total > 0 && cur >= total) { rafId = null; next(); return; }   // 合成音 / MIDI / 真实音频通用
     updateProgress();
     rafId = requestAnimationFrame(loop);
   }
@@ -700,6 +769,75 @@
     navigator.mediaSession.setActionHandler("pause", pausePlayback);
     navigator.mediaSession.setActionHandler("previoustrack", prev);
     navigator.mediaSession.setActionHandler("nexttrack", next);
+  }
+
+  /* ---- 添加 MIDI 文件 ---- */
+  const MIDI_MOTIFS = ["moon", "rain", "fog", "sun", "ripple", "mountain"];
+  const MIDI_PALETTES = [
+    [[150, 140, 120], [210, 196, 168], [104, 92, 76]],
+    [[120, 150, 170], [180, 200, 214], [80, 104, 128]],
+    [[160, 130, 160], [206, 178, 206], [104, 84, 116]],
+    [[130, 160, 140], [188, 208, 196], [84, 110, 96]],
+    [[170, 140, 120], [214, 188, 168], [112, 88, 76]],
+    [[110, 130, 170], [170, 186, 214], [70, 84, 120]],
+  ];
+  function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
+
+  function makeMidiTrack(title, midi) {
+    const inst = [...new Set(midi.notes.map((n) => n.instrumentName))].slice(0, 3).join(" · ");
+    const h = hashStr(title);
+    return {
+      type: "midi",
+      title,
+      artist: "MIDI · " + (inst || "多声部"),
+      motif: MIDI_MOTIFS[h % MIDI_MOTIFS.length],
+      rgb: MIDI_PALETTES[h % MIDI_PALETTES.length],
+      midi,
+      dur: Math.max(1, Math.round(midi.duration)),
+      src: "",
+    };
+  }
+
+  let toastTimer = null;
+  function showToast(msg, ms = 2600) {
+    if (!els.toast) return;
+    els.toast.textContent = msg;
+    els.toast.classList.add("show");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove("show"), ms);
+  }
+
+  async function addMidiFile(file) {
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const parsed = TingxiMidi.parseMidi(buf);
+      if (!parsed.notes || !parsed.notes.length) throw new Error("empty");
+      const name = file.name.replace(/\.(mid|midi)$/i, "");
+      const track = makeMidiTrack(name, parsed);
+      PLAYLIST.push(track);
+      renderPlaylist();
+      Engine.prepareMidi(track);                 // 后台预载音色
+      showToast(`已添加：${name}（${parsed.notes.length} 音符）`);
+    } catch (e) {
+      showToast("无法解析该 MIDI 文件");
+    }
+  }
+
+  if (els.midiAdd && els.midiInput) {
+    els.midiAdd.addEventListener("click", () => els.midiInput.click());
+    els.midiInput.addEventListener("change", (e) => {
+      for (const f of e.target.files) addMidiFile(f);
+      e.target.value = "";
+    });
+    // 拖拽到播放器也可添加
+    els.player.addEventListener("dragover", (e) => { e.preventDefault(); });
+    els.player.addEventListener("drop", (e) => {
+      e.preventDefault();
+      for (const f of e.dataTransfer.files) {
+        if (/\.(mid|midi)$/i.test(f.name)) addMidiFile(f);
+      }
+    });
   }
 
   /* ---- 初始化 ---- */
