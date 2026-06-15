@@ -70,7 +70,7 @@
       this.compressor.ratio.value = 12;
       this.compressor.attack.value = 0.003;
       this.compressor.release.value = 0.25;
-      this.master = ctx.createGain(); this.master.gain.value = 1.0;
+      this.master = ctx.createGain(); this.master.gain.value = 2.0;   // SoundFont 单音偏弱，提升输出补偿响度
       this.reverb = this._createReverb();
       const reverbGain = ctx.createGain(); reverbGain.gain.value = 0.18;
       this.compressor.connect(this.master);
